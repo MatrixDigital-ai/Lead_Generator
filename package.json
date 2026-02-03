@@ -1,7 +1,14 @@
 {
-  "name": "openlead-web",
-  "version": "0.1.0",
+  "name": "matrix-ai-lead-generator",
+  "version": "1.0.0",
+  "description": "Matrix AI Lead Generator - Intelligent B2B lead discovery platform powered by AI",
   "private": true,
+  "author": "Matrix Digital AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MatrixDigital-ai/Lead_Generator"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,6 +16,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "cheerio": "^1.2.0",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3"
@@ -23,5 +31,8 @@
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
