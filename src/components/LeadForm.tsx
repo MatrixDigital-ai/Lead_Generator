@@ -7,16 +7,141 @@ interface LeadFormProps {
   isLoading: boolean;
 }
 
+// Valid industry keywords
+const VALID_INDUSTRIES = [
+  'software', 'technology', 'tech', 'it', 'healthcare', 'medical', 'health', 'finance', 'financial',
+  'banking', 'insurance', 'real estate', 'realty', 'construction', 'manufacturing', 'retail',
+  'ecommerce', 'e-commerce', 'marketing', 'advertising', 'media', 'consulting', 'legal', 'law',
+  'education', 'training', 'hospitality', 'hotel', 'restaurant', 'food', 'beverage', 'automotive',
+  'logistics', 'shipping', 'transportation', 'travel', 'tourism', 'energy', 'oil', 'gas', 'renewable',
+  'telecom', 'telecommunications', 'pharma', 'pharmaceutical', 'biotech', 'agriculture', 'farming',
+  'textile', 'fashion', 'apparel', 'beauty', 'cosmetics', 'entertainment', 'gaming', 'sports',
+  'fitness', 'wellness', 'saas', 'cloud', 'cybersecurity', 'security', 'ai', 'artificial intelligence',
+  'data', 'analytics', 'hr', 'human resources', 'staffing', 'recruitment', 'accounting', 'tax',
+  'architecture', 'design', 'engineering', 'aerospace', 'defense', 'government', 'nonprofit',
+  'publishing', 'printing', 'packaging', 'chemicals', 'plastics', 'metals', 'mining', 'electronics',
+  'semiconductors', 'hardware', 'furniture', 'home', 'garden', 'pet', 'veterinary', 'dental',
+  'optometry', 'mental health', 'therapy', 'cleaning', 'janitorial', 'plumbing', 'electrical',
+  'hvac', 'roofing', 'landscaping', 'photography', 'video', 'music', 'art', 'craft', 'jewelry',
+];
+
+// Common location patterns
+const LOCATION_PATTERNS = [
+  // Cities, states, countries - just check for reasonable text
+  /^[a-zA-Z\s,.-]+$/,
+];
+
+// Invalid patterns
+const INVALID_PATTERNS = [
+  /^[0-9]+$/, // Only numbers
+  /^[^a-zA-Z]+$/, // No letters at all
+  /(.)\1{4,}/, // Same character repeated 5+ times
+  /^(test|asdf|qwerty|abc|xyz|xxx|aaa|bbb|123|hello|hi|bye|null|undefined|none|na|n\/a)$/i,
+];
+
+function validateIndustry(value: string): string | null {
+  const trimmed = value.trim().toLowerCase();
+  
+  if (trimmed.length < 2) {
+    return 'Industry must be at least 2 characters';
+  }
+  
+  if (trimmed.length > 100) {
+    return 'Industry is too long';
+  }
+  
+  // Check for invalid patterns
+  for (const pattern of INVALID_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return 'Please enter a valid industry (e.g., Software, Healthcare, Finance)';
+    }
+  }
+  
+  // Check if it contains at least one valid industry keyword or is reasonably formatted
+  const hasValidKeyword = VALID_INDUSTRIES.some(keyword => 
+    trimmed.includes(keyword) || keyword.includes(trimmed)
+  );
+  
+  const hasLetters = /[a-zA-Z]{2,}/.test(trimmed);
+  const isReasonableFormat = /^[a-zA-Z][a-zA-Z\s&-]*[a-zA-Z]$/.test(trimmed) || /^[a-zA-Z]{2,}$/.test(trimmed);
+  
+  if (!hasValidKeyword && !isReasonableFormat) {
+    return 'Please enter a valid industry (e.g., Software Development, Healthcare, Marketing)';
+  }
+  
+  if (!hasLetters) {
+    return 'Industry must contain letters';
+  }
+  
+  return null;
+}
+
+function validateLocation(value: string): string | null {
+  const trimmed = value.trim();
+  
+  if (trimmed.length < 2) {
+    return 'Location must be at least 2 characters';
+  }
+  
+  if (trimmed.length > 100) {
+    return 'Location is too long';
+  }
+  
+  // Check for invalid patterns
+  for (const pattern of INVALID_PATTERNS) {
+    if (pattern.test(trimmed.toLowerCase())) {
+      return 'Please enter a valid location (e.g., New York, California, USA)';
+    }
+  }
+  
+  // Must have letters
+  if (!/[a-zA-Z]{2,}/.test(trimmed)) {
+    return 'Location must contain letters';
+  }
+  
+  // Should look like a location (letters, spaces, commas, periods)
+  if (!/^[a-zA-Z][a-zA-Z\s,.-]*[a-zA-Z.]?$/.test(trimmed) && !/^[a-zA-Z]{2,}$/.test(trimmed)) {
+    return 'Please enter a valid location (e.g., New York, London, India)';
+  }
+  
+  return null;
+}
+
 export default function LeadForm({ onSubmit, isLoading }: LeadFormProps) {
   const [industry, setIndustry] = useState('');
   const [location, setLocation] = useState('');
   const [maxResults, setMaxResults] = useState(10);
+  const [industryError, setIndustryError] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  const handleIndustryChange = (value: string) => {
+    setIndustry(value);
+    if (industryError && value.trim()) {
+      setIndustryError(null);
+    }
+  };
+
+  const handleLocationChange = (value: string) => {
+    setLocation(value);
+    if (locationError && value.trim()) {
+      setLocationError(null);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (industry.trim() && location.trim()) {
-      onSubmit(industry.trim(), location.trim(), maxResults);
+    
+    const indError = validateIndustry(industry);
+    const locError = validateLocation(location);
+    
+    setIndustryError(indError);
+    setLocationError(locError);
+    
+    if (indError || locError) {
+      return;
     }
+    
+    onSubmit(industry.trim(), location.trim(), maxResults);
   };
 
   return (
@@ -59,18 +184,27 @@ export default function LeadForm({ onSubmit, isLoading }: LeadFormProps) {
                 type="text"
                 id="industry"
                 value={industry}
-                onChange={(e) => setIndustry(e.target.value)}
+                onChange={(e) => handleIndustryChange(e.target.value)}
                 placeholder="e.g., Software Development, Healthcare, Finance"
-                className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-200 
-                           bg-slate-50 text-slate-800
+                className={`w-full pl-12 pr-4 py-3.5 rounded-xl border 
+                           ${industryError ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-slate-50'} 
+                           text-slate-800
                            focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white
-                           placeholder-slate-400 transition-all text-base"
+                           placeholder-slate-400 transition-all text-base`}
                 required
                 minLength={2}
                 maxLength={100}
                 disabled={isLoading}
               />
             </div>
+            {industryError && (
+              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {industryError}
+              </p>
+            )}
           </div>
 
           {/* Location Input */}
@@ -94,18 +228,27 @@ export default function LeadForm({ onSubmit, isLoading }: LeadFormProps) {
                 type="text"
                 id="location"
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                onChange={(e) => handleLocationChange(e.target.value)}
                 placeholder="e.g., New York, California, United States"
-                className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-200 
-                           bg-slate-50 text-slate-800
+                className={`w-full pl-12 pr-4 py-3.5 rounded-xl border 
+                           ${locationError ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-slate-50'} 
+                           text-slate-800
                            focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white
-                           placeholder-slate-400 transition-all text-base"
+                           placeholder-slate-400 transition-all text-base`}
                 required
                 minLength={2}
                 maxLength={100}
                 disabled={isLoading}
               />
             </div>
+            {locationError && (
+              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {locationError}
+              </p>
+            )}
           </div>
 
           {/* Max Results Slider */}

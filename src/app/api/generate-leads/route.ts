@@ -34,6 +34,69 @@ function generateFallbackResults(industry: string, location: string, maxResults:
   return results;
 }
 
+// Validation patterns for invalid inputs
+const INVALID_PATTERNS = [
+  /^[0-9]+$/, // Only numbers
+  /^[^a-zA-Z]+$/, // No letters at all
+  /(.)\1{4,}/, // Same character repeated 5+ times
+  /^(test|asdf|qwerty|abc|xyz|xxx|aaa|bbb|123|hello|hi|bye|null|undefined|none|na|n\/a)$/i,
+];
+
+// Valid industry keywords for backend validation
+const VALID_INDUSTRY_KEYWORDS = [
+  'software', 'technology', 'tech', 'it', 'healthcare', 'medical', 'health', 'finance', 'financial',
+  'banking', 'insurance', 'real estate', 'construction', 'manufacturing', 'retail', 'marketing',
+  'advertising', 'consulting', 'legal', 'education', 'hospitality', 'automotive', 'logistics',
+  'transportation', 'travel', 'energy', 'telecom', 'pharma', 'biotech', 'agriculture', 'textile',
+  'fashion', 'beauty', 'entertainment', 'gaming', 'sports', 'fitness', 'saas', 'cloud', 'security',
+  'data', 'analytics', 'hr', 'staffing', 'accounting', 'architecture', 'design', 'engineering',
+  'aerospace', 'defense', 'publishing', 'chemicals', 'electronics', 'furniture', 'dental', 'cleaning',
+  'plumbing', 'electrical', 'hvac', 'photography', 'video', 'music', 'art', 'jewelry', 'food',
+  'restaurant', 'agency', 'services', 'solutions', 'development', 'web', 'mobile', 'app', 'digital',
+];
+
+function isValidInput(value: string): boolean {
+  const trimmed = value.trim().toLowerCase();
+  
+  // Check for invalid patterns
+  for (const pattern of INVALID_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return false;
+    }
+  }
+  
+  // Must have at least 2 letters
+  if (!/[a-zA-Z]{2,}/.test(trimmed)) {
+    return false;
+  }
+  
+  return true;
+}
+
+function isValidIndustry(value: string): boolean {
+  if (!isValidInput(value)) return false;
+  
+  const trimmed = value.trim().toLowerCase();
+  
+  // Check if contains valid industry keyword or is reasonably formatted
+  const hasValidKeyword = VALID_INDUSTRY_KEYWORDS.some(keyword => 
+    trimmed.includes(keyword) || keyword.includes(trimmed)
+  );
+  
+  const isReasonableFormat = /^[a-zA-Z][a-zA-Z\s&-]*[a-zA-Z]$/.test(trimmed) || /^[a-zA-Z]{2,}$/.test(trimmed);
+  
+  return hasValidKeyword || isReasonableFormat;
+}
+
+function isValidLocation(value: string): boolean {
+  if (!isValidInput(value)) return false;
+  
+  const trimmed = value.trim();
+  
+  // Should look like a location (letters, spaces, commas, periods)
+  return /^[a-zA-Z][a-zA-Z\s,.-]*[a-zA-Z.]?$/.test(trimmed) || /^[a-zA-Z]{2,}$/.test(trimmed);
+}
+
 export async function POST(request: NextRequest) {
   // Get client IP for rate limiting
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
@@ -69,6 +132,22 @@ export async function POST(request: NextRequest) {
     if (industry.length < 2 || location.length < 2) {
       return NextResponse.json(
         { error: 'Industry and location must be at least 2 characters.' },
+        { status: 400 }
+      );
+    }
+
+    // Validate industry
+    if (!isValidIndustry(industry)) {
+      return NextResponse.json(
+        { error: 'Please enter a valid industry (e.g., Software Development, Healthcare, Marketing).' },
+        { status: 400 }
+      );
+    }
+
+    // Validate location
+    if (!isValidLocation(location)) {
+      return NextResponse.json(
+        { error: 'Please enter a valid location (e.g., New York, California, United States).' },
         { status: 400 }
       );
     }
