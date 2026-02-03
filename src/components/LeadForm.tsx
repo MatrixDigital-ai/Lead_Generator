@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 interface LeadFormProps {
   onSubmit: (industry: string, location: string, maxResults: number) => void;
@@ -23,12 +23,7 @@ const VALID_INDUSTRIES = [
   'semiconductors', 'hardware', 'furniture', 'home', 'garden', 'pet', 'veterinary', 'dental',
   'optometry', 'mental health', 'therapy', 'cleaning', 'janitorial', 'plumbing', 'electrical',
   'hvac', 'roofing', 'landscaping', 'photography', 'video', 'music', 'art', 'craft', 'jewelry',
-];
-
-// Common location patterns
-const LOCATION_PATTERNS = [
-  // Cities, states, countries - just check for reasonable text
-  /^[a-zA-Z\s,.-]+$/,
+  'agency', 'services', 'solutions', 'development', 'web', 'mobile', 'app', 'digital', 'startup',
 ];
 
 // Invalid patterns
@@ -39,109 +34,83 @@ const INVALID_PATTERNS = [
   /^(test|asdf|qwerty|abc|xyz|xxx|aaa|bbb|123|hello|hi|bye|null|undefined|none|na|n\/a)$/i,
 ];
 
-function validateIndustry(value: string): string | null {
+function isValidIndustry(value: string): boolean {
   const trimmed = value.trim().toLowerCase();
   
-  if (trimmed.length < 2) {
-    return 'Industry must be at least 2 characters';
-  }
-  
-  if (trimmed.length > 100) {
-    return 'Industry is too long';
-  }
+  if (trimmed.length < 2) return false;
+  if (trimmed.length > 100) return false;
   
   // Check for invalid patterns
   for (const pattern of INVALID_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      return 'Please enter a valid industry (e.g., Software, Healthcare, Finance)';
-    }
+    if (pattern.test(trimmed)) return false;
   }
   
-  // Check if it contains at least one valid industry keyword or is reasonably formatted
+  // Must have letters
+  if (!/[a-zA-Z]{2,}/.test(trimmed)) return false;
+  
+  // Check if contains valid industry keyword or is reasonably formatted
   const hasValidKeyword = VALID_INDUSTRIES.some(keyword => 
     trimmed.includes(keyword) || keyword.includes(trimmed)
   );
   
-  const hasLetters = /[a-zA-Z]{2,}/.test(trimmed);
   const isReasonableFormat = /^[a-zA-Z][a-zA-Z\s&-]*[a-zA-Z]$/.test(trimmed) || /^[a-zA-Z]{2,}$/.test(trimmed);
   
-  if (!hasValidKeyword && !isReasonableFormat) {
-    return 'Please enter a valid industry (e.g., Software Development, Healthcare, Marketing)';
-  }
-  
-  if (!hasLetters) {
-    return 'Industry must contain letters';
-  }
-  
-  return null;
+  return hasValidKeyword || isReasonableFormat;
 }
 
-function validateLocation(value: string): string | null {
+function isValidLocation(value: string): boolean {
   const trimmed = value.trim();
   
-  if (trimmed.length < 2) {
-    return 'Location must be at least 2 characters';
-  }
-  
-  if (trimmed.length > 100) {
-    return 'Location is too long';
-  }
+  if (trimmed.length < 2) return false;
+  if (trimmed.length > 100) return false;
   
   // Check for invalid patterns
   for (const pattern of INVALID_PATTERNS) {
-    if (pattern.test(trimmed.toLowerCase())) {
-      return 'Please enter a valid location (e.g., New York, California, USA)';
-    }
+    if (pattern.test(trimmed.toLowerCase())) return false;
   }
   
   // Must have letters
-  if (!/[a-zA-Z]{2,}/.test(trimmed)) {
-    return 'Location must contain letters';
-  }
+  if (!/[a-zA-Z]{2,}/.test(trimmed)) return false;
   
   // Should look like a location (letters, spaces, commas, periods)
-  if (!/^[a-zA-Z][a-zA-Z\s,.-]*[a-zA-Z.]?$/.test(trimmed) && !/^[a-zA-Z]{2,}$/.test(trimmed)) {
-    return 'Please enter a valid location (e.g., New York, London, India)';
-  }
+  const looksLikeLocation = /^[a-zA-Z][a-zA-Z\s,.-]*[a-zA-Z.]?$/.test(trimmed) || /^[a-zA-Z]{2,}$/.test(trimmed);
   
-  return null;
+  return looksLikeLocation;
+}
+
+function getIndustryHint(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (isValidIndustry(value)) return null;
+  return 'Enter a valid industry (e.g., Software, Healthcare, Finance)';
+}
+
+function getLocationHint(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (isValidLocation(value)) return null;
+  return 'Enter a valid location (e.g., New York, California, USA)';
 }
 
 export default function LeadForm({ onSubmit, isLoading }: LeadFormProps) {
   const [industry, setIndustry] = useState('');
   const [location, setLocation] = useState('');
   const [maxResults, setMaxResults] = useState(10);
-  const [industryError, setIndustryError] = useState<string | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
 
-  const handleIndustryChange = (value: string) => {
-    setIndustry(value);
-    if (industryError && value.trim()) {
-      setIndustryError(null);
-    }
-  };
-
-  const handleLocationChange = (value: string) => {
-    setLocation(value);
-    if (locationError && value.trim()) {
-      setLocationError(null);
-    }
-  };
+  // Real-time validation
+  const industryValid = useMemo(() => isValidIndustry(industry), [industry]);
+  const locationValid = useMemo(() => isValidLocation(location), [location]);
+  const industryHint = useMemo(() => getIndustryHint(industry), [industry]);
+  const locationHint = useMemo(() => getLocationHint(location), [location]);
+  
+  // Button is only enabled when both inputs are valid
+  const isFormValid = industryValid && locationValid;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const indError = validateIndustry(industry);
-    const locError = validateLocation(location);
-    
-    setIndustryError(indError);
-    setLocationError(locError);
-    
-    if (indError || locError) {
-      return;
+    if (isFormValid && !isLoading) {
+      onSubmit(industry.trim(), location.trim(), maxResults);
     }
-    
-    onSubmit(industry.trim(), location.trim(), maxResults);
   };
 
   return (
@@ -184,25 +153,36 @@ export default function LeadForm({ onSubmit, isLoading }: LeadFormProps) {
                 type="text"
                 id="industry"
                 value={industry}
-                onChange={(e) => handleIndustryChange(e.target.value)}
+                onChange={(e) => setIndustry(e.target.value)}
                 placeholder="e.g., Software Development, Healthcare, Finance"
-                className={`w-full pl-12 pr-4 py-3.5 rounded-xl border 
-                           ${industryError ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-slate-50'} 
+                className={`w-full pl-12 pr-10 py-3.5 rounded-xl border 
+                           ${industry && !industryValid ? 'border-amber-400 bg-amber-50' : industry && industryValid ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 bg-slate-50'} 
                            text-slate-800
                            focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white
                            placeholder-slate-400 transition-all text-base`}
-                required
-                minLength={2}
                 maxLength={100}
                 disabled={isLoading}
               />
+              {industry && (
+                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                  {industryValid ? (
+                    <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  )}
+                </div>
+              )}
             </div>
-            {industryError && (
-              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+            {industryHint && (
+              <p className="mt-2 text-sm text-amber-600 flex items-center gap-1">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                {industryError}
+                {industryHint}
               </p>
             )}
           </div>
@@ -228,25 +208,36 @@ export default function LeadForm({ onSubmit, isLoading }: LeadFormProps) {
                 type="text"
                 id="location"
                 value={location}
-                onChange={(e) => handleLocationChange(e.target.value)}
+                onChange={(e) => setLocation(e.target.value)}
                 placeholder="e.g., New York, California, United States"
-                className={`w-full pl-12 pr-4 py-3.5 rounded-xl border 
-                           ${locationError ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-slate-50'} 
+                className={`w-full pl-12 pr-10 py-3.5 rounded-xl border 
+                           ${location && !locationValid ? 'border-amber-400 bg-amber-50' : location && locationValid ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 bg-slate-50'} 
                            text-slate-800
                            focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white
                            placeholder-slate-400 transition-all text-base`}
-                required
-                minLength={2}
                 maxLength={100}
                 disabled={isLoading}
               />
+              {location && (
+                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                  {locationValid ? (
+                    <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  )}
+                </div>
+              )}
             </div>
-            {locationError && (
-              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+            {locationHint && (
+              <p className="mt-2 text-sm text-amber-600 flex items-center gap-1">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                {locationError}
+                {locationHint}
               </p>
             )}
           </div>
@@ -286,14 +277,14 @@ export default function LeadForm({ onSubmit, isLoading }: LeadFormProps) {
         {/* Submit Button */}
         <button
           type="submit"
-          disabled={isLoading || !industry.trim() || !location.trim()}
-          className="w-full mt-6 py-4 px-6 matrix-gradient
+          disabled={isLoading || !isFormValid}
+          className={`w-full mt-6 py-4 px-6 
+                     ${isFormValid ? 'matrix-gradient hover:opacity-90 hover:shadow-lg' : 'bg-slate-300 cursor-not-allowed'}
                      text-white font-semibold rounded-xl
                      transform transition-all duration-200 
-                     hover:opacity-90 hover:shadow-lg
                      active:scale-[0.98]
-                     disabled:opacity-50 disabled:cursor-not-allowed
-                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                     disabled:opacity-70 disabled:cursor-not-allowed
+                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
         >
           {isLoading ? (
             <span className="flex items-center justify-center gap-3">
